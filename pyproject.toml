@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quickqudits"
+version = "1.0.0"
+description = "Simulation of noisy qudit Clifford circuits via extended stabilizer tableau formalism."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+
+authors = [
+  { name = "Mykyta Cherniak", email = "mykyta.cherniak@jku.at" },
+  { name = "Nina Brandl", email = "nina.brandl@jku.at" }
+]
+
+keywords = ["quantum", "quantum computing", "qudits", "stabilizer formalism", "Clifford circuits", "noisy simulation", "tableau", "noise"]
+
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "numpy>=1.26.4; python_version < '3.13'",
+  "numpy>=2.1.0; python_version >= '3.13'",
+  "sympy>=1.14.0",
+]
+
+[project.optional-dependencies]
+numba = [
+  "numba>=0.61.0",
+]
+
+plot = [
+  "matplotlib>=3.8",
+]
+
+test = [
+  "pytest>=8",
+  "qutip>=5",
+  "qiskit>=1.0",
+]
+
+docs = [
+  "pdoc>=14",
+]
+
+[project.urls]
+Homepage = "https://github.com/QUICK-JKU/QuickQudits"
+Repository = "https://github.com/QUICK-JKU/QuickQudits"
+Documentation = "https://github.com/QUICK-JKU/QuickQudits"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+license-files = ["LICENSE", "NOTICE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

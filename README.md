@@ -45,7 +45,7 @@ import quickqudits as qq
 
 # initialize circuit
 n, d = 5, 3  # 5 qudits of dimension 3
-qc = qq.QuantumCircuit(n, d)
+qc = qq.QuantumCircuit(n, d, name="example")
 
 # add gates
 qc.CXdag(2, 0)
@@ -67,7 +67,15 @@ qc.add_noise_global(0.5)
 
 # visualize circuit
 qc.draw(show_info=True)
+```
 
+### Generated circuit
+
+The circuit produced by `qc.draw(show_info=True)`:
+
+![Example circuit](images/example_circuit.png)
+
+```python
 # initialize tableau
 tab = qq.Tableau(5, 3)
 
@@ -82,7 +90,8 @@ tab.apply_circuit(qc)
 print(tab)
 ```
 
-Output:
+### Output
+
 ```plaintext
 [[2 0 0 0 1]
  [0 2 2 0 1]

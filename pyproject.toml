@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quickqudits"
-version = "1.0.0"
+version = "1.0.1"
 description = "Simulation of noisy qudit Clifford circuits via extended stabilizer tableau formalism."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -49,9 +49,9 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/QUICK-JKU/QuickQudits"
+Homepage = "https://quick-jku.github.io/QuickQudits/"
 Repository = "https://github.com/QUICK-JKU/QuickQudits"
-Documentation = "https://github.com/QUICK-JKU/QuickQudits"
+Documentation = "https://quick-jku.github.io/QuickQudits/"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

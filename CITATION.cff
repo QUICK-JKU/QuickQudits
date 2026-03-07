@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use QuickQudits, please cite it."
 title: QuickQudits
-version: "1.0.0"
+version: "1.0.1"
 type: software
 license: Apache-2.0
-date-released: 2026-02-20
+date-released: 2026-03-07
 
 authors:
   - given-names: Mykyta

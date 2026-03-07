@@ -18,8 +18,7 @@ jobs:
           python-version: "3.11"
       - run: |
           python -m pip install --upgrade pip
-          pip install pdoc
-          pip install -e .
+          pip install -e ".[docs,numba,plot]"
       - run: pdoc -d numpy -o site quickqudits
       - uses: actions/upload-pages-artifact@v3
         with:

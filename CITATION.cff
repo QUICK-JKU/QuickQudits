@@ -11,10 +11,11 @@ authors:
     family-names: Cherniak
     affiliation: Johannes Kepler University Linz
     email: mykyta.cherniak@jku.at
+    orcid: https://orcid.org/0009-0002-4128-6386
 
   - given-names: Nina
     family-names: Brandl
     affiliation: Johannes Kepler University Linz
     email: nina.brandl@jku.at
-
+    orcid: https://orcid.org/0009-0007-0688-4985
 repository-code: "https://github.com/QUICK-JKU/QuickQudits"

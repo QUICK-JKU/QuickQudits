@@ -3003,8 +3003,8 @@ class Tableau:
             q = qudits[0]
             xq = x[:, q].copy()
             zq = z[:, q]
-            x[:, q] = (dir_ * zq) % d
-            z[:, q] = (-dir_ * xq) % d
+            x[:, q] = (-dir_ * zq) % d
+            z[:, q] = (dir_ * xq) % d
             return
         elif key == "S":
             q = qudits[0]

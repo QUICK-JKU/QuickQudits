@@ -2344,7 +2344,7 @@ class Tableau:
         Efficiently samples measurement outcomes using the affine subspace method.
 
         This method is significantly faster than calling measure_all() repeatedly.
-        It first computes the affine subspace of all possible measurement outcomes
+        It first computeto_ps the affine subspace of all possible measurement outcomes
         and then generates random samples from this space.
 
         The complexity is O(n^3 * log(d)) for a one-time setup, followed by

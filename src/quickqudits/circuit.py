@@ -11,8 +11,10 @@ import copy
 from typing import TYPE_CHECKING, Generator, Literal, Optional, Union
 
 import numpy as np
+from numba.cuda.cudadrv import ndarray
 
 from . import backend, gates
+from .backend import COMPLEX_DTYPE
 from .gate_class import Gate, NoiseChannel
 from .predefined_gates import (
     CNOT_gate,
@@ -83,6 +85,11 @@ class QuantumCircuit:
         self.name = name
         # Store tuples: (Gate, indices, dagger_flag)
         self._ops: list[tuple[Gate, tuple[int, ...], bool]] = []
+
+        # Store states for mid-circuit-measurements
+        self._stored_psi = None
+        # Current gate index
+        self._gate_idx = 0
 
         # --- Noise Registry System ---
         # The key is a unique model ID (int).
@@ -1347,6 +1354,7 @@ class QuantumCircuit:
         psi0: Optional[np.ndarray] = None,
         normalize: bool = True,
         print_state: bool = False,
+        mid_circuit: bool = False
     ) -> tuple[np.ndarray, dict[int, int]]:
         """
         Execute the circuit using statevector simulation.
@@ -1365,6 +1373,9 @@ class QuantumCircuit:
             If True, renormalize the final statevector before returning it.
         print_state : bool, default=False
             If True, print the statevector at the start and after each operation.
+        mid_circuit : bool, default=False
+            If True, prohibits overwriting of already measured qubits.
+            Enables mid-circuit-measurements.
 
         Returns
         -------
@@ -1373,7 +1384,8 @@ class QuantumCircuit:
         classical_results : dict[int, int]
             Dictionary mapping ``{measured_qudit_index: outcome}`` for each
             measurement encountered in the circuit. If a qudit is measured multiple
-            times, later outcomes overwrite earlier ones.
+            times, later outcomes overwrite earlier ones. Executing with a set time_flag
+            disables this, allowing for mid-circuit-measurements.
 
         Raises
         ------
@@ -1385,6 +1397,11 @@ class QuantumCircuit:
         """
         n, d = self.n, self.d
         size = d**n
+        measure_count = 0
+
+        if mid_circuit and self._stored_psi is not None:
+            psi0 = self._stored_psi.copy()
+
         psi = (
             np.zeros(size, dtype=backend.COMPLEX_DTYPE)
             if psi0 is None
@@ -1399,7 +1416,8 @@ class QuantumCircuit:
         if print_state:
             print(f"Initial state:\n{psi}")
 
-        for gate, qidx, dag in self:
+        for i in range(self._gate_idx, len(self._ops)):
+            gate, qidx, dag = self._ops[i]
             if gate.matrix_fn is None and gate._apply_fn is None:
                 if gate.name == "M":
                     measured_qudit = qidx[0]
@@ -1407,7 +1425,14 @@ class QuantumCircuit:
                     key = measured_qudit
                     classical_results[key] = outcome
                     if print_state:
-                        print(f"Measured qudit {measured_qudit}, outcome={outcome}")
+                        print(f"Measured qudit   {measured_qudit}, outcome={outcome}")
+                    if mid_circuit:
+                        measure_count += 1
+                        psi = self._normalize_state(psi, normalize)
+                        self._gate_idx = i + 1
+                        if measure_count >= sum(gate.name == "M" for gate, _, _ in self._ops):
+                            self._stored_psi = psi.copy()
+                            return psi, classical_results
                 else:
                     if print_state:
                         print(
@@ -1422,15 +1447,19 @@ class QuantumCircuit:
                         f" on qudit{'s' if len(qidx) > 1 else ''}"
                         f" {', '.join(map(str, qidx))}:\n{psi}"
                     )
+        psi = self._normalize_state(psi, normalize)
+        self._gate_idx = 0
+        self._stored_psi = None
+        return psi, classical_results
+
+    def _normalize_state(self, psi, normalize):
         if normalize:
             nrm = np.linalg.norm(psi)
             if nrm == 0:
                 raise ValueError("Normalization error: final statevector is zero.")
-            psi = (psi / nrm).astype(backend.COMPLEX_DTYPE, copy=False)
+            return (psi / nrm).astype(backend.COMPLEX_DTYPE, copy=False)
         else:
-            psi = psi.astype(backend.COMPLEX_DTYPE, copy=False)
-
-        return psi, classical_results
+            return psi.astype(backend.COMPLEX_DTYPE, copy=False)
 
     # --- Density Matrices Simulation ---
 

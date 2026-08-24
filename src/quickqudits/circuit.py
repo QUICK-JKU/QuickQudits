@@ -8,6 +8,7 @@ quantum gates and handles the simulation of statevectors and density matrices.
 from __future__ import annotations
 
 import copy
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Generator, Literal, Optional, Union
 
 import numpy as np
@@ -90,6 +91,12 @@ class QuantumCircuit:
         self._stored_psi = None
         # Current gate index
         self._gate_idx = 0
+        # Measurement database entries: (qudit, local interaction timestamp, outcome).
+        self._measurement_results: list[tuple[int, int, int]] = []
+        # Next interaction timestamp for each qudit in the current execution.
+        self._qudit_timestamps = [0] * self.n
+        # Latest outcome per qudit for the current (possibly resumed) execution.
+        self._latest_measurements: dict[int, int] = {}
 
         # --- Noise Registry System ---
         # The key is a unique model ID (int).
@@ -1224,6 +1231,74 @@ class QuantumCircuit:
         for qudit in range(self.n):
             self.measure(qudit)
 
+    def get_measurement(
+        self,
+        timestamp: Optional[Union[int, Collection[int]]] = None,
+        qudits: Optional[Union[int, Collection[int]]] = None,
+    ) -> list[tuple[int, int, int]]:
+        """Query the measurement database by timestamp and/or qudit.
+
+        Each qudit has an independent clock starting at zero. Every executed gate
+        touching a qudit consumes one timestamp on that qudit. Only measurement
+        interactions create database entries, represented as
+        ``(qudit, timestamp, result)``.
+
+        Parameters
+        ----------
+        timestamp : int or collection of int, optional
+            A single timestamp or collection of timestamps to select. If omitted,
+            all recorded measurements are returned.
+        qudits : int or collection of int, optional
+            A single qudit or collection of qudits to select. If omitted,
+            measurements from all qudits are returned.
+
+        Returns
+        -------
+        list[tuple[int, int, int]]
+            Matching ``(qudit, timestamp, result)`` entries in execution order.
+
+        Raises
+        ------
+        TypeError
+            If either filter is neither an integer nor a collection of integers.
+        ValueError
+            If a timestamp is negative or a qudit index is out of range.
+        """
+        def normalize_filter(value, name: str) -> Optional[set[int]]:
+            if value is None:
+                return None
+            if isinstance(value, int) and not isinstance(value, bool):
+                return {value}
+            if isinstance(value, Collection) and not isinstance(
+                value, (str, bytes, dict)
+            ):
+                if not all(
+                    isinstance(item, int) and not isinstance(item, bool)
+                    for item in value
+                ):
+                    raise TypeError(f"All {name} must be integers.")
+                return set(value)
+            raise TypeError(
+                f"`{name}` must be an integer or a collection of integers."
+            )
+
+        timestamps = normalize_filter(timestamp, "timestamps")
+        selected_qudits = normalize_filter(qudits, "qudits")
+
+        if timestamps is not None and any(value < 0 for value in timestamps):
+            raise ValueError("Timestamps must be non-negative.")
+        if selected_qudits is not None and any(
+            value < 0 or value >= self.n for value in selected_qudits
+        ):
+            raise ValueError(f"Qudit indices must be between 0 and {self.n - 1}.")
+
+        return [
+            entry
+            for entry in self._measurement_results
+            if (timestamps is None or entry[1] in timestamps)
+            and (selected_qudits is None or entry[0] in selected_qudits)
+        ]
+
     def _perform_measurement(
         self, psi: np.ndarray, n: int, d: int, qudit: int
     ) -> tuple[np.ndarray, int]:
@@ -1354,7 +1429,7 @@ class QuantumCircuit:
         psi0: Optional[np.ndarray] = None,
         normalize: bool = True,
         print_state: bool = False,
-        mid_circuit: bool = False
+        mid_circuit: bool = False,
     ) -> tuple[np.ndarray, dict[int, int]]:
         """
         Execute the circuit using statevector simulation.
@@ -1374,18 +1449,18 @@ class QuantumCircuit:
         print_state : bool, default=False
             If True, print the statevector at the start and after each operation.
         mid_circuit : bool, default=False
-            If True, prohibits overwriting of already measured qubits.
-            Enables mid-circuit-measurements.
+            If True, enables resumable mid-circuit measurements. Successive calls
+            continue from the state collapsed by the preceding measurement stage.
 
         Returns
         -------
         psi : np.ndarray
             Final statevector of shape ``(d**n,)``.
         classical_results : dict[int, int]
-            Dictionary mapping ``{measured_qudit_index: outcome}`` for each
-            measurement encountered in the circuit. If a qudit is measured multiple
-            times, later outcomes overwrite earlier ones. Executing with a set time_flag
-            disables this, allowing for mid-circuit-measurements.
+            Dictionary mapping each measured qudit to its latest outcome in the
+            current execution, including preceding stages resumed with
+            ``mid_circuit=True``. Every individual outcome remains available through
+            :meth:`get_measurement` as a ``(qudit, timestamp, result)`` entry.
 
         Raises
         ------
@@ -1399,8 +1474,25 @@ class QuantumCircuit:
         size = d**n
         measure_count = 0
 
-        if mid_circuit and self._stored_psi is not None:
-            psi0 = self._stored_psi.copy()
+        if mid_circuit:
+            execution_start = self._gate_idx
+            remaining_measurements = sum(
+                gate.name == "M" for gate, _, _ in self._ops[execution_start:]
+            )
+            if self._stored_psi is not None:
+                psi0 = self._stored_psi.copy()
+            elif execution_start == 0:
+                self._latest_measurements = {}
+                self._measurement_results = []
+                self._qudit_timestamps = [0] * n
+        else:
+            execution_start = 0
+            remaining_measurements = 0
+            self._gate_idx = 0
+            self._stored_psi = None
+            self._latest_measurements = {}
+            self._measurement_results = []
+            self._qudit_timestamps = [0] * n
 
         psi = (
             np.zeros(size, dtype=backend.COMPLEX_DTYPE)
@@ -1408,31 +1500,36 @@ class QuantumCircuit:
             else psi0.copy().astype(backend.COMPLEX_DTYPE)
         )
 
-        classical_results = {}
-
         if psi0 is None:
             psi[0] = 1
 
         if print_state:
             print(f"Initial state:\n{psi}")
 
-        for i in range(self._gate_idx, len(self._ops)):
+        for i in range(execution_start, len(self._ops)):
             gate, qidx, dag = self._ops[i]
             if gate.matrix_fn is None and gate._apply_fn is None:
                 if gate.name == "M":
                     measured_qudit = qidx[0]
                     psi, outcome = self._perform_measurement(psi, n, d, measured_qudit)
-                    key = measured_qudit
-                    classical_results[key] = outcome
+                    timestamp = self._qudit_timestamps[measured_qudit]
+                    self._measurement_results.append(
+                        (measured_qudit, timestamp, outcome)
+                    )
+                    self._qudit_timestamps[measured_qudit] += 1
+                    self._latest_measurements[measured_qudit] = outcome
                     if print_state:
-                        print(f"Measured qudit   {measured_qudit}, outcome={outcome}")
+                        print(
+                            f"Measured qudit {measured_qudit}, outcome={outcome}, "
+                            f"timestamp={timestamp}"
+                        )
                     if mid_circuit:
                         measure_count += 1
                         psi = self._normalize_state(psi, normalize)
                         self._gate_idx = i + 1
-                        if measure_count >= sum(gate.name == "M" for gate, _, _ in self._ops):
+                        if measure_count >= remaining_measurements:
                             self._stored_psi = psi.copy()
-                            return psi, classical_results
+                            return psi, self._latest_measurements.copy()
                 else:
                     if print_state:
                         print(
@@ -1441,6 +1538,8 @@ class QuantumCircuit:
                     continue
             else:
                 psi = gate.apply(psi, n, d, qidx, dag)
+                for qudit in set(qidx):
+                    self._qudit_timestamps[qudit] += 1
                 if print_state:
                     print(
                         f"\nState after {gate.name}{'†' if dag else ''}"
@@ -1450,7 +1549,7 @@ class QuantumCircuit:
         psi = self._normalize_state(psi, normalize)
         self._gate_idx = 0
         self._stored_psi = None
-        return psi, classical_results
+        return psi, self._latest_measurements.copy()
 
     def _normalize_state(self, psi, normalize):
         if normalize:

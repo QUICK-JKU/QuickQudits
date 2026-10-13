@@ -361,7 +361,7 @@ def apply_CNOT_reshape_idx(
     dagger: bool = False,
 ) -> np.ndarray:
     """
-    Apply CNOT to any pair of qudits using reshaping.
+    Apply CNOT to any pair of qudits using strided statevector views.
 
     Parameters
     ----------
@@ -381,26 +381,21 @@ def apply_CNOT_reshape_idx(
     np.ndarray
         The transformed statevector.
     """
-    i, j = qudits
-    psi_nd = psi.reshape([d] * n)
-    axes = [i, j] + [k for k in range(n) if k not in (i, j)]
-    tpsi = np.transpose(psi_nd, axes)
-    flat = tpsi.reshape(d * d, -1)
+    control, target = qudits
+    shape = (d,) * n
+    source = np.moveaxis(psi.reshape(shape), (control, target), (0, 1))
+    out = np.empty(psi.shape, dtype=psi.dtype)
+    destination = np.moveaxis(out.reshape(shape), (control, target), (0, 1))
 
-    c = np.arange(d, dtype=backend.INT_DTYPE)[:, None]
-    t = np.arange(d, dtype=backend.INT_DTYPE)[None, :]
-    dt = (t - c) if dagger else (t + c)
-    perm_indices = (c * d + dt % d).reshape(-1)
+    # Qudit 0 is the most significant digit. Each assignment copies the
+    # amplitudes for fixed control and target digits; all other axes remain
+    # strided views, so no full-size permutation/index array is needed.
+    sign = -1 if dagger else 1
+    for c in range(d):
+        for t in range(d):
+            destination[c, (t + sign * c) % d] = source[c, t]
 
-    flat_permuted = np.empty_like(flat)
-    flat_permuted[perm_indices] = flat
-
-    tpsi2 = flat_permuted.reshape([d, d] + [d] * (n - 2))
-
-    inv_axes = np.argsort(axes)
-    out = np.transpose(tpsi2, inv_axes)
-
-    return out.reshape(d**n)
+    return out
 
 
 def apply_CZ_reshape_idx(

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Collection
+from string import hexdigits
 from typing import TYPE_CHECKING, Generator, Literal, Optional, Union
 
 import numpy as np
-from numba.cuda.cudadrv import ndarray
 
 from . import backend, gates
 from .backend import COMPLEX_DTYPE
@@ -1861,7 +1861,7 @@ class QuantumCircuit:
         normalized_probs : np.ndarray
             Flattened Weyl probability vector of length ``d*d`` (assumed normalized).
         color : str
-            Base color specification accepted by Matplotlib.
+            Hex color, or a Matplotlib color when the optional plot extra is installed.
 
         Returns
         -------
@@ -1871,14 +1871,33 @@ class QuantumCircuit:
         Raises
         ------
         ValueError
-            If ``color`` is not a valid Matplotlib color specification.
+            If ``color`` is invalid or requires the unavailable plot extra.
         """
-        from matplotlib import colors as mcolors
-
-        try:
-            base_rgba = mcolors.to_rgba(color)
-        except ValueError:
-            raise ValueError(f"Invalid color format: '{color}'")
+        # Hex colors, including the default, must work in the base installation.
+        # Matplotlib is only needed for its additional color-name formats.
+        if (
+            isinstance(color, str)
+            and color.startswith("#")
+            and len(color) in (4, 5, 7, 9)
+            and all(digit in hexdigits for digit in color[1:])
+        ):
+            digits = color[1:]
+            if len(digits) in (3, 4):
+                rgb = tuple(int(digit * 2, 16) / 255 for digit in digits[:3])
+            else:
+                rgb = tuple(int(digits[i : i + 2], 16) / 255 for i in (0, 2, 4))
+        else:
+            try:
+                from matplotlib import colors as mcolors
+            except ImportError as exc:
+                raise ValueError(
+                    "Use a hex color such as '#FF0000', or install "
+                    "quickqudits[plot] for other color formats."
+                ) from exc
+            try:
+                rgb = mcolors.to_rgba(color)[:3]
+            except ValueError as exc:
+                raise ValueError(f"Invalid color format: '{color}'") from exc
 
         # Calculate opacity from the total error probability.
         # The probability of NO error (W_00) is the first element.
@@ -1886,7 +1905,7 @@ class QuantumCircuit:
         opacity = 1.0 - prob_no_error
 
         # Create the RGBA color tuple for the gate.
-        final_color = (*base_rgba[:3], opacity)
+        final_color = (*rgb, opacity)
 
         return final_color
 

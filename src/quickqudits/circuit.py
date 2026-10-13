@@ -1396,6 +1396,9 @@ class QuantumCircuit:
         ------
         ValueError
             If `shots <= 0`.
+        NotImplementedError
+            If the circuit contains a NoiseChannel; sampling uses the
+            statevector execution path, which does not support these channels.
         """
         if shots <= 0:
             raise ValueError(f"`shots` must be positive, got {shots}.")
@@ -1466,10 +1469,21 @@ class QuantumCircuit:
         ------
         ValueError
             If ``normalize=True`` and the final statevector has zero norm.
+        NotImplementedError
+            If the circuit contains a NoiseChannel. Use density-matrix
+            execution or realize the noise before statevector execution.
         Exception
             Any exception raised by gate application (``gate.apply``) or measurement
             (``self._perform_measurement``) is propagated.
         """
+        if any(isinstance(gate, NoiseChannel) for gate, _, _ in self._ops):
+            raise NotImplementedError(
+                "QuantumCircuit.execute() does not support NoiseChannel operations. "
+                "Use execute_density_matrix() for Weyl noise (it does not perform "
+                "mid-circuit measurements), or call realize_noise(seed=..., "
+                "in_place=False) and then execute() for one stochastic realization."
+            )
+
         n, d = self.n, self.d
         size = d**n
         measure_count = 0

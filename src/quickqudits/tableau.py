@@ -2676,8 +2676,13 @@ class Tableau:
             tab = type(self)(n, d, full=True)
             tab.apply_circuit(noisy_qc)
 
-            _, shot_outcome = tab.measure_all(
+            measurement = tab.measure_all(
                 in_place=False, seed=int(per_shot_meas_seeds[i])
+            )
+            # Tableau returns (tableau, outcomes); CompositeTableau returns
+            # the outcomes array directly.
+            shot_outcome = (
+                measurement[1] if isinstance(measurement, tuple) else measurement
             )
 
             outcomes[i] = np.asarray(shot_outcome, dtype=np.int64)

@@ -92,6 +92,7 @@ s4 |  0  0  0  0  1 |  1  0  0  0  0 | 0
 - `accelerators.numba_fast` — Numba JIT kernels for fast tableau updates (optional)
 - `backend` — global dtype/precision configuration (`set_precision`)
 - `gate_class` — `Gate` and `NoiseChannel` definitions
+- `gate_noise` — `GateNoiseConfig` for before/after gate-dependent noise
 - `gates` — numerical matrix builders for standard qudit gates
 - `predefined_gates` — pre-instantiated gate objects (e.g. `H_gate`, `CNOT_gate`, …)
 - `visualization` — Matplotlib circuit drawing backend
@@ -118,6 +119,7 @@ Classes:
 - `CompositeTableau` — stabilizer tableau for composite d
 - `Gate` — gate metadata + matrix generation logic
 - `NoiseChannel` — gate subclass representing noise models
+- `GateNoiseConfig` — materializes gate-dependent noise before execution
 
 Selected utilities:
 
@@ -141,6 +143,7 @@ except PackageNotFoundError:
 
 from . import backend, io, utils
 from .circuit import QuantumCircuit
+from .gate_noise import GateNoiseConfig
 from .predefined_gates import *
 from .tableau import Tableau
 from .tableau_composite import CompositeTableau

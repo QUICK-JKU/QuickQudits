@@ -317,7 +317,7 @@ def CZ(d: int) -> np.ndarray:
             np.exp(
                 2j * np.pi / d * (np.arange(d)[:, None] * np.arange(d)[None, :])
             ).ravel()
-        ),
+        ).astype(backend.COMPLEX_DTYPE),
     )
 
 
@@ -586,26 +586,28 @@ def apply_W_reshape_idx(
     a %= d
     b %= d
 
-    # Reshape statevector
-    psi_nd = psi.reshape([d] * n)
+    # Keep the fresh, non-aliasing result while avoiding strided phase passes.
+    if d == 2 and a == 0 and b == 0:
+        return psi.copy()
 
-    # Global phase τ^{-ab}
-    phase_global = np.power(tau(d), -a * b)
-    psi_nd = psi_nd * phase_global
-
-    # Apply Z^b (diagonal phasing)
-    if b != 0:
-        phases = np.power(omega(d), b * np.arange(d, dtype=backend.INT_DTYPE))
-        # Reshape to broadcast correctly along axis j
-        phase_shape = [1] * n
-        phase_shape[j] = d
-        psi_nd = psi_nd * phases.reshape(phase_shape)
-
-    # Apply X^a (cyclic shift)
-    if a != 0:
-        psi_nd = np.roll(psi_nd, shift=a, axis=j)
-
-    return psi_nd.reshape(d**n)
+    # Form the d phases at high precision, then cast only this small table.
+    # W = τ^{-ab} X^a Z^b: the phase belongs to the input target digit.
+    phases = np.asarray(
+        np.power(tau(d), -a * b)
+        * np.power(omega(d), b * np.arange(d, dtype=backend.INT_DTYPE)),
+        dtype=psi.dtype,
+    )
+    shape = (d,) * n
+    source = np.moveaxis(psi.reshape(shape), j, 0)
+    out = np.empty(psi.shape, dtype=psi.dtype)
+    destination = np.moveaxis(out.reshape(shape), j, 0)
+    for t in range(d):
+        target = (t + a) % d
+        if n == 1:
+            destination[target] = source[t] * phases[t]
+        else:
+            np.multiply(source[t], phases[t], out=destination[target])
+    return out
 
 
 # ===========================================================================

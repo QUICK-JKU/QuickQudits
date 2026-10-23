@@ -37,6 +37,15 @@ if TYPE_CHECKING:
     pass
 
 
+def _statevector_norm(psi: np.ndarray) -> np.float64:
+    """Accumulate the squared norm in float64 without casting the statevector."""
+    real = psi.real.reshape(-1)
+    imag = psi.imag.reshape(-1)
+    real_squared = np.einsum("i,i->", real, real, dtype=np.float64)
+    imag_squared = np.einsum("i,i->", imag, imag, dtype=np.float64)
+    return np.sqrt(real_squared + imag_squared)
+
+
 # ===========================================================================
 # QuantumCircuit Class
 # ===========================================================================
@@ -1330,8 +1339,8 @@ class QuantumCircuit:
         psi_nd = psi.reshape([d] * n)
 
         axes_to_sum = tuple(i for i in range(n) if i != qudit)
-        probs = np.sum(np.abs(psi_nd) ** 2, axis=axes_to_sum)
-        probs /= np.sum(probs)
+        probs = np.sum(np.abs(psi_nd) ** 2, axis=axes_to_sum, dtype=np.float64)
+        probs /= np.sum(probs, dtype=np.float64)
 
         measured_val = np.random.choice(np.arange(d, dtype=np.int32), p=probs)
 
@@ -1340,7 +1349,7 @@ class QuantumCircuit:
         sl[qudit] = measured_val
         new_psi_nd[tuple(sl)] = psi_nd[tuple(sl)]
 
-        norm = np.linalg.norm(new_psi_nd)
+        norm = _statevector_norm(new_psi_nd)
         if norm > 1e-9:
             new_psi_nd /= norm
 
@@ -1406,8 +1415,8 @@ class QuantumCircuit:
         psi, _ = self.execute(psi0=psi0, normalize=normalize)
         psi = np.asarray(psi)
 
-        probs = np.abs(psi) ** 2
-        s = probs.sum()
+        probs = np.square(np.abs(psi), dtype=np.float64)
+        s = probs.sum(dtype=np.float64)
         if not np.isclose(s, 1.0):
             if s == 0:
                 raise ValueError("Final statevector has zero norm; cannot sample.")
@@ -1494,7 +1503,7 @@ class QuantumCircuit:
                 gate.name == "M" for gate, _, _ in self._ops[execution_start:]
             )
             if self._stored_psi is not None:
-                psi0 = self._stored_psi.copy()
+                psi0 = self._stored_psi
             elif execution_start == 0:
                 self._latest_measurements = {}
                 self._measurement_results = []
@@ -1511,7 +1520,7 @@ class QuantumCircuit:
         psi = (
             np.zeros(size, dtype=backend.COMPLEX_DTYPE)
             if psi0 is None
-            else psi0.copy().astype(backend.COMPLEX_DTYPE)
+            else np.array(psi0, dtype=backend.COMPLEX_DTYPE, copy=True)
         )
 
         if psi0 is None:
@@ -1567,10 +1576,12 @@ class QuantumCircuit:
 
     def _normalize_state(self, psi, normalize):
         if normalize:
-            nrm = np.linalg.norm(psi)
+            nrm = _statevector_norm(psi)
             if nrm == 0:
                 raise ValueError("Normalization error: final statevector is zero.")
-            return (psi / nrm).astype(backend.COMPLEX_DTYPE, copy=False)
+            return np.divide(
+                psi, nrm, out=np.empty_like(psi, dtype=backend.COMPLEX_DTYPE)
+            )
         else:
             return psi.astype(backend.COMPLEX_DTYPE, copy=False)
 

@@ -184,11 +184,14 @@ class Gate:
 
         # Optimized 1-qudit system case
         if n == 1:
-            U = self.matrix(d, dagger)
+            U = np.asarray(self.matrix(d, dagger), dtype=psi.dtype)
             return U @ psi
 
         # General Tensor Contraction
-        Umat = self.dagger_matrix_fn(d) if dagger else self.matrix_fn(d)
+        Umat = np.asarray(
+            self.dagger_matrix_fn(d) if dagger else self.matrix_fn(d),
+            dtype=psi.dtype,
+        )
         k = self.n_qudits
 
         U = Umat.reshape((d,) * k + (d,) * k)

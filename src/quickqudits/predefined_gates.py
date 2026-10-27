@@ -35,7 +35,7 @@ I_gate = Gate("I", 1, gates.I, gates.I_dag)
 X_gate = Gate("X", 1, gates.X, gates.X_dag)
 Y_gate = Gate("Y", 1, gates.Y, gates.Y_dag)
 Z_gate = Gate("Z", 1, gates.Z, gates.Z_dag)
-H_gate = Gate("H", 1, gates.H, gates.H_dag)
+H_gate = Gate("H", 1, gates.H, gates.H_dag, apply_fn=gates.apply_H_matmul)
 S_gate = Gate("S", 1, gates.S, gates.S_dag)
 
 # 2-Qudit Gates

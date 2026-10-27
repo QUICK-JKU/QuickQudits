@@ -717,6 +717,25 @@ def H_dag(d: int) -> np.ndarray:
     return _cached("H†", d, lambda: _dag(H(d)))
 
 
+def apply_H_matmul(
+    psi: np.ndarray, n: int, d: int, qudits: tuple[int, ...], dagger: bool = False
+) -> np.ndarray:
+    """Apply the local Fourier matrix without permuting the full statevector.
+
+    The state is viewed as (outer, d, inner), where the middle axis is the
+    target qudit. Matmul writes a new state; the input is never modified.
+    """
+    q = qudits[0]
+    matrix = np.asarray(H_dag(d) if dagger else H(d), dtype=psi.dtype)
+    inner = d ** (n - q - 1)
+    if q == 0:
+        return (matrix @ psi.reshape(d, -1)).reshape(-1)
+    if inner == 1:
+        return (psi.reshape(-1, d) @ matrix.T).reshape(-1)
+    outer = d**q
+    return np.matmul(matrix, psi.reshape(outer, d, inner)).reshape(-1)
+
+
 def S_dag(d: int) -> np.ndarray:
     """
     Return the dagger of S.

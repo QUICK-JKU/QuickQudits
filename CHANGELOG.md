@@ -13,9 +13,12 @@ The format follows [Semantic Versioning](https://semver.org/).
   coherent information `I2 = S2(Q) - S2(RQ)` under Pauli noise. It compiles an effect table
   once, samples the noiseless outcomes once, and applies noise by table lookup for every `p`.
   Standard errors by the delta method; `shots_for_target_se` sizes the shot budget.
+- `NoisyCircuitSampler`: samples any Clifford circuit with Pauli (Weyl) noise channels from a
+  compiled effect table, same distribution as `sample_measurements_noisy_pf` and about 4-5x faster
+  on surface-code encoders (d = 3 ... 9). `sample(..., probs=...)` rescans the noise without recompiling.
 - Helpers: `duplicate_circuit_vertical`, `add_destructive_swap_test`, `bitflip_noise_model`,
   `depolarizing_noise_model`, `run_unit_tests` (self-check against `sample_measurements_noisy_pf`).
-- `tests/test_pauli_frame.py`.
+- `tests/test_pauli_frame.py`, `tests/test_noisy_circuit_sampler.py`.
 
 ---
 

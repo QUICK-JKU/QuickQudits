@@ -145,6 +145,7 @@ from .predefined_gates import *
 from .tableau import Tableau
 from .tableau_composite import CompositeTableau
 from .pauli_frame import (
+    NoisyCircuitSampler,
     PauliFrameSampler,
     add_destructive_swap_test,
     bitflip_noise_model,

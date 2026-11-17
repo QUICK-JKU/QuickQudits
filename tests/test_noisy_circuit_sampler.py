@@ -1,13 +1,15 @@
 import numpy as np
 import pytest
 
-from quickqudits import (
-    NoisyCircuitSampler,
-    QuantumCircuit,
-    Tableau,
-    bitflip_noise_model,
-    depolarizing_noise_model,
-)
+from quickqudits import NoisyCircuitSampler, QuantumCircuit, Tableau
+
+
+def bitflip_noise_model(p):
+    return np.array([[1 - p, 0.0], [p, 0.0]])
+
+
+def depolarizing_noise_model(p):
+    return np.array([[1 - p, p / 3], [p / 3, p / 3]])
 
 SHOTS = 300_000
 
@@ -73,3 +75,22 @@ def test_noiseless_circuit_and_shapes():
     out = s.sample(1000, seed=0)
     assert s.n_locations == 0 and out.shape == (1000, 2)
     assert (out[:, 0] == out[:, 1]).all()  # Bell pair
+
+
+def test_pool_reuse_matches_fresh_sampling_and_checks_size():
+    qc = _circuit_d2(depolarizing_noise_model(0.15))
+    s = NoisyCircuitSampler(qc)
+    s.precompute_noiseless_pool(SHOTS, seed=7)
+    pooled = _probvector(s.sample(SHOTS, seed=8, use_pool=True), 2)
+    theirs = Tableau(3, 2).to_probvector_noisy_pf(qc, SHOTS, seed=9)
+    assert np.abs(pooled - theirs).max() < 0.008
+    with pytest.raises(ValueError):
+        s.sample(SHOTS + 1, use_pool=True)
+
+
+def test_pool_offset_gives_disjoint_slices():
+    s = NoisyCircuitSampler(_circuit_d2(bitflip_noise_model(0.0)))
+    pool = s.precompute_noiseless_pool(1000, seed=1)
+    a = s.sample(400, seed=2, use_pool=True)
+    b = s.sample(400, seed=2, use_pool=True, pool_offset=400)
+    assert (a == pool[:400]).all() and (b == pool[400:800]).all()

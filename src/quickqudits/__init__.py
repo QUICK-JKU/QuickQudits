@@ -144,13 +144,4 @@ from .circuit import QuantumCircuit
 from .predefined_gates import *
 from .tableau import Tableau
 from .tableau_composite import CompositeTableau
-from .pauli_frame import (
-    NoisyCircuitSampler,
-    PauliFrameSampler,
-    add_destructive_swap_test,
-    bitflip_noise_model,
-    depolarizing_noise_model,
-    duplicate_circuit_vertical,
-    run_unit_tests,
-    shots_for_target_se,
-)
+from .pauli_frame import NoisyCircuitSampler

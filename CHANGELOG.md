@@ -9,16 +9,12 @@ The format follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- `quickqudits.pauli_frame`: `PauliFrameSampler`, a fast swap-test estimator of the Renyi-2
-  coherent information `I2 = S2(Q) - S2(RQ)` under Pauli noise. It compiles an effect table
-  once, samples the noiseless outcomes once, and applies noise by table lookup for every `p`.
-  Standard errors by the delta method; `shots_for_target_se` sizes the shot budget.
-- `NoisyCircuitSampler`: samples any Clifford circuit with Pauli (Weyl) noise channels from a
-  compiled effect table, same distribution as `sample_measurements_noisy_pf` and about 4-5x faster
-  on surface-code encoders (d = 3 ... 9). `sample(..., probs=...)` rescans the noise without recompiling.
-- Helpers: `duplicate_circuit_vertical`, `add_destructive_swap_test`, `bitflip_noise_model`,
-  `depolarizing_noise_model`, `run_unit_tests` (self-check against `sample_measurements_noisy_pf`).
-- `tests/test_pauli_frame.py`, `tests/test_noisy_circuit_sampler.py`.
+- `quickqudits.pauli_frame.NoisyCircuitSampler`: samples any Clifford circuit with Pauli (Weyl)
+  noise channels from a compiled effect table. Same distribution as
+  `Tableau.sample_measurements_noisy_pf`, about 4-5x faster on surface-code encoders
+  (d = 3 ... 9). `precompute_noiseless_pool` caches the clean outcomes; `sample(..., probs=...)`
+  rescans the noise strength without recompiling.
+- `tests/test_noisy_circuit_sampler.py`.
 
 ---
 
